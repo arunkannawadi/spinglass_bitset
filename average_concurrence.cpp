@@ -61,8 +61,8 @@ double* average_concurrence(VectorXd state, int m)
   bitset<Nqubits> *basis;
   basis = definite_particle_basis(m);
   
-  double v,y,z;
-  double C, avgC, avgTangle, sumTangle=0,sumC=0; 
+  double v,w,x,y,z;
+  double C, avgC, avgTangle, LN2, avgLN2, sumLN2=0,sumTangle=0,sumC=0; 
   for(i=1;i<L;i++)
    for(j=0;j<i;j++)
    {
@@ -73,6 +73,10 @@ double* average_concurrence(VectorXd state, int m)
         y += state(k)*state(k);
       else if((basis[k][i]==0)&(basis[k][j]==0))
         v += state(k)*state(k);
+      else if((basis[k][i]==0)&(basis[k][j]==1))
+        x += state(k)*state(k);
+      else if((basis[k][i]==1)&(basis[k][j]==0))    
+        w += state(k)*state(k);
       else
       {
         for(l=0;l<k;l++)
@@ -89,16 +93,21 @@ double* average_concurrence(VectorXd state, int m)
      cout << "C = " << C << endl;
      sumC += C;
      sumTangle += C*C;
+     
+     LN2 = log(v+y+z+sqrt(w*x)+abs(z-sqrt(w*y)));
+     sumLN2 += LN2;
    }
    
     int LC2; LC2 = nchoosek(L,2);
     
     avgC = sumC/LC2;
     avgTangle = sumTangle/LC2;
+    avgLN2 = sumLN2/LC2;
     
-    double *entanglement = new double[2];
+    double *entanglement = new double[3];
     entanglement[0] = avgC;
     entanglement[1] = avgTangle;
+    entanglement[2] = avgLN2;
     
     return entanglement;
 }
