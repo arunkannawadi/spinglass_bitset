@@ -11,28 +11,38 @@
 #include<string>
 #include<Eigen/Dense>
 #include<Eigen/Eigenvalues>
+#include <boost/multiprecision/cpp_int.hpp>
 
 using namespace std; 
 using namespace Eigen;
+using namespace boost::multiprecision;
 
 #define root2 1.414213562373095
 #define PI 3.141592653589793238462
 
-unsigned long long int *definite_particle_basis(int m, int LCm)
+unsigned int ctz128(int128_t num)
+{
+ unsigned int ctz = 0;
+ while(((num>>(ctz+1))<<(ctz+1)==num)&(ctz<128))
+    ctz++; 
+ return ctz; 
+}
+
+int128_t *definite_particle_basis(int m, int LCm)
 {
  int i,k;
- unsigned long long int v,w,t;
+ int128_t v,w,t;
 
  //states = (unsigned long long int*)malloc(LCm*sizeof(unsigned long long int));
- unsigned long long int *states = new unsigned long long int[LCm]; 
- v = (1ULL << m) - 1;
+ int128_t *states = new int128_t[LCm]; 
+ v = (1 << m) - 1;
  k = 0;
  
  while(k<LCm)
  {
   states[k++] = v;
   t = v | (v-1);
-  v = (t+1) | (((~t & -~t) -1) >> (__builtin_ctzll(v)+1));
+  v = (t+1) | (((~t & -~t) -1) >> (ctz128(v)+1));
  }
  
  return states;
@@ -49,36 +59,48 @@ inline void flip(unsigned int &n, unsigned int K)
   n = n&K ? n&(~K) : n|K ;
 }
 
-inline void reset(unsigned long long &n,unsigned long long K)
+inline void flip_uint128(int128_t &n, int128_t K)
+{
+  n = n&K ? n&(~K) : n|K ;
+}
+
+inline void reset(int128_t &n,int128_t K)
 {
   n = n&(~K);
 }
 
-inline void set(unsigned long long &n,unsigned long long K)
+inline void set(int128_t &n,int128_t K)
 {
   n = n|K;
 }
 
+/*
 inline void setequal_ull(unsigned long long &n, unsigned long long K, unsigned int binary)
 {
   n = binary==0 ? n&(~K) : n|K;
 }
 
-inline void setequal(unsigned int &n, unsigned int K, unsigned long long binary)
+inline void setequal(unsigned int &n, unsigned int K, int128_t binary)
 {
   n = binary==0 ? n&(~K) : n|K;
 }
 
-inline unsigned int access_bit(unsigned long long n, unsigned long long K)
+inline void setequal_uint128(unsigned int &n, unsigned int K, int128_t binary)
+{
+  n = binary==0 ? n&(~K) : n|K;
+}
+*/
+
+inline unsigned int access_bit(int128_t n, int128_t K)
 {
   return (n&K) ? 1 : 0;
 }
 
-double VNE1(VectorXd state, unsigned long long *basis, int L, int m, int LCm)
+double VNE1(VectorXd state, int128_t *basis, int L, int m, int LCm)
 {
  double disc, lambda, VNE, avgVNE, sumVNE=0, x=0,y=0,z=0;
  int i,j,l;
- unsigned long long ll;
+ int128_t ll;
  
  for(l=0,ll=1;l<L;l++,ll=ll<<1)
   {
@@ -108,11 +130,11 @@ double VNE1(VectorXd state, unsigned long long *basis, int L, int m, int LCm)
   return avgVNE; 
 }
 
-void average_concurrence(double *entanglement, VectorXd state, unsigned long long *basis, int L, int m, int LCm)
+void average_concurrence(double *entanglement, VectorXd state, int128_t *basis, int L, int m, int LCm)
 {
   int i,j,k,l;
   unsigned int pc=0; 
-  unsigned long long ii,jj,kk,ll;
+  int128_t ii,jj,kk,ll;
   int nchoosek(int,int);
   void flip(int*,int);
            
@@ -121,12 +143,12 @@ void average_concurrence(double *entanglement, VectorXd state, unsigned long lon
   for(i=1;i<L;i++)
    for(j=0;j<i;j++)
    {
-    ii = 0x01ULL<<i;
-    jj = 0x01ULL<<j;
+    ii = 1<<i;
+    jj = 1<<j;
     v=0; y=0; z=0; w=0; x=0;
     for(k=0;k<LCm;k++)
      {
-      kk = 0x01ULL<<k;
+      kk = 1<<k;
       if(((basis[k]&ii)==0)&((basis[k]&jj)==0))
        { v += state(k)*state(k); }
       else if(((basis[k]&ii)==0)&((basis[k]&jj)>0))
@@ -136,14 +158,14 @@ void average_concurrence(double *entanglement, VectorXd state, unsigned long lon
       else if(((basis[k]&ii)>0)&((basis[k]&jj)>0))    
         y += state(k)*state(k);
 
-      flipull(basis[k],ii); flipull(basis[k],jj);    
+      flip_uint128(basis[k],ii); flip_uint128(basis[k],jj);    
       for(l=0;l<k;l++)
        {
         if(basis[k]==basis[l])
           z += state(k)*state(l);
         } 
        
-       flipull(basis[k],ii); flipull(basis[k],jj);
+       flip_uint128(basis[k],ii); flip_uint128(basis[k],jj);
        
      }
      
@@ -196,12 +218,13 @@ void average_concurrence(double *entanglement, VectorXd state, unsigned long lon
     // return entanglement;
 }
 
-void LN3(double *q3_entanglement, VectorXd state, unsigned long long int* basis, int L, int m, int LCm)
+/*
+void LN3(double *q3_entanglement, VectorXd state, int128_t* basis, int L, int m, int LCm)
 {
  SelfAdjointEigenSolver<MatrixXd> es(8);
  bitset<3> B,B1, B2;
  unsigned int b,b1, b2, n1,n2,pp,p,i,j,k,l,l1,l2;
- unsigned long long ii,jj,kk;
+ int128_t ii,jj,kk;
  int nchoosek(int,int);
  int LC3 = nchoosek(L,3);
  
@@ -209,12 +232,12 @@ void LN3(double *q3_entanglement, VectorXd state, unsigned long long int* basis,
  MatrixXd rho = MatrixXd::Zero(8,8);
  VectorXd eigenvals;
  
- /* i,j,k - Qubit indices */
- /* l1,l2  - Basis indices */
+ // i,j,k - Qubit indices 
+ // l1,l2  - Basis indices 
  
- for(i=2,ii=4ULL;i<L;i++,ii=ii<<1)
-  for(j=1,jj=2ULL;j<i;j++,jj=jj<<1)
-   for(k=0, kk=1ULL;k<j;k++,kk=kk<<1)
+ for(i=2,ii=4;i<L;i++,ii=ii<<1)
+  for(j=1,jj=2;j<i;j++,jj=jj<<1)
+   for(k=0, kk=1;k<j;k++,kk=kk<<1)
    {
     for(p=0,pp=1;p<=3;p++,pp=pp<<1)
     {
@@ -239,11 +262,8 @@ void LN3(double *q3_entanglement, VectorXd state, unsigned long long int* basis,
           
       for(l2=0;l2<l1;l2++)
       {
-       /* 
-       B2.set(0,basis[l2][k]);
-       B2.set(1,basis[l2][j]);
-       B2.set(2,basis[l2][i]);
-       */
+       //   B2.set(0,basis[l2][k]);        B2.set(1,basis[l2][j]);       B2.set(2,basis[l2][i]);
+       
        b2 = 0;
        setequal(b2,1<<0,basis[l2]&kk);
        setequal(b2,1<<1,basis[l2]&jj);
@@ -265,14 +285,14 @@ void LN3(double *q3_entanglement, VectorXd state, unsigned long long int* basis,
          { flip(b2,pp); flip(b1,pp); }
        }
        
-       setequal_ull(basis[l2],ii,b2&(1<<2)); setequal_ull(basis[l2],jj,b2&(1<<1)); setequal_ull(basis[l2],kk,b2&(1<<0)); 
+       setequal_uint128(basis[l2],ii,b2&(1<<2)); setequal_uint128(basis[l2],jj,b2&(1<<1)); setequal_uint128(basis[l2],kk,b2&(1<<0)); 
        b2 = 0;
       }
-      setequal_ull(basis[l1],ii,b1&(1<<2)); setequal_ull(basis[l1],jj,b1&(1<<1)); setequal_ull(basis[l2],kk,b1&(1<<0));              
+      setequal_uint128(basis[l1],ii,b1&(1<<2)); setequal_uint128(basis[l1],jj,b1&(1<<1)); setequal_uint128(basis[l2],kk,b1&(1<<0));              
       b1 = 0;
      }
                    
-     /* Diagonalize PPT here */
+     // Diagonalize PPT here //
      es.compute(rho,EigenvaluesOnly);
      eigenvals = es.eigenvalues();
 
@@ -300,6 +320,7 @@ void LN3(double *q3_entanglement, VectorXd state, unsigned long long int* basis,
    q3_entanglement[0] = avgLN3;
    q3_entanglement[1] = avgVNE;
 }
+*/
 
 double PR(VectorXd state)
 {
@@ -313,14 +334,14 @@ double PR(VectorXd state)
  return pr;
 }
 
-MatrixXd hamiltonian(double** J, unsigned long long *basis, int m, int L,int LCm)
+MatrixXd hamiltonian(double** J, int128_t *basis, int m, int L,int LCm)
 {
  
   const unsigned int constL = L;  
   int i,j,k,n1,n2,n0;
-  unsigned long long N1, N2, N0;
-  unsigned long long u,v,w,x,y;
-  unsigned long long one;
+  int128_t N1, N2, N0;
+  int128_t u,v,w,x,y;
+  int128_t one;
   // one.set(0);
     
   double tmp, sigmaJ;
@@ -338,10 +359,10 @@ MatrixXd hamiltonian(double** J, unsigned long long *basis, int m, int L,int LCm
        u = basis[i];
        v = basis[j];       
 
-       for(n1=0,N1=1ULL;access_bit(u,N1)==access_bit(v,N1);n1++,N1=N1<<1);
+       for(n1=0,N1=1;access_bit(u,N1)==access_bit(v,N1);n1++,N1=N1<<1);
        for(n2=n1+1, N2=(N1<<1);access_bit(u,N2)==access_bit(v,N2);n2++,N2=N2<<1);
        
-       for(n0=n2+1,N0=1ULL<<(n2+1);n0<L;n0++,N0=N0<<1)
+       for(n0=n2+1,N0=1<<(n2+1);n0<L;n0++,N0=N0<<1)
          if(!(access_bit(u,N0)==access_bit(v,N0)))
           n0=L+2;
        if(n0==L)
@@ -508,8 +529,8 @@ int main(int argc, char** argv)
       cout << " Input values for atleast L" << endl; return 0;
   }
   
-  if(L>64)
-    { cout << "L cannot exceed 64. Program exited" << endl; return 1;}
+  if(L>=128)
+    { cout << "L cannot exceed 128. Program exited" << endl; return 1;}
       
   /* For random number generation */
   struct timeval start;
@@ -523,13 +544,13 @@ int main(int argc, char** argv)
 //  double **symm_gauss_rand_mat_gen(int);
 //  MatrixXd hamiltonian(double**, int*,int,int,int);
   int nchoosek(int,int);
-  unsigned long long* definite_particle_basis(int,int);
+  int128_t* definite_particle_basis(int,int);
   double PR(VectorXd);
 //  VectorXd gauss_rand_vec_gen(int,int);
  
   /* Variable declarations */
   int i,j,k,l,N,LC2 = nchoosek(L,2),m=1;
-  unsigned long long *basis2, *basis1;
+  int128_t *basis2, *basis1;
   double norm2, ln3, pr,sigmaJ, **J;
   
   VectorXd vector1, vector2;
@@ -560,7 +581,7 @@ int main(int argc, char** argv)
   ofstream myfile, myfile_promo; /* technically, a memory leak */ 
   myfile.open(filename.c_str(),fstream::out | fstream::app);
   
-  filename = "Data_SG/NN_Promo_L";
+  filename = "Data_SG/NN_promo_L";
   filename += strL.str();
   filename += ".txt";
   myfile_promo.open(filename.c_str(),fstream::out | fstream::app);
@@ -596,8 +617,9 @@ int main(int argc, char** argv)
    
    for(l=0;l<L;l++)
    {
+    cout << " N = " << N << " l/L = " << l << "/" << L << endl;
     vector1 = ES.eigenvectors().col(l);
-    if(abs(vector1.sum())<0.5)
+    if(abs(vector1.sum())<0.5) // avoids the all-one state
     {
      for(k=0,i=1;i<L;i++)
       for(j=0;j<i;j++)
@@ -606,19 +628,23 @@ int main(int argc, char** argv)
       }
       
      promo_vector = promo_vector/promo_vector.norm();        
-      
+     
+     time(&t1); 
      average_concurrence(q2_entanglement, vector1,basis1,L,1,L);  
+     time(&t2); cout << " Average concurrence for 1-particle vector computed in " << difftime(t2,t1) << " seconds \n";
      //LN3(q3_entanglement, vector2,basis2,L,m,LCm);
      q3_entanglement[0] = -1; q3_entanglement[1] = -1;
      pr = PR(vector1);
         
      myfile << pr << "\t" << ES.eigenvalues()[l] << "\t" << ES.eigenvalues()[l] - sigmaJ << "\t" << q2_entanglement[0] << "\t" << q2_entanglement[1] << "\t" << q2_entanglement[2] << "\t" << q2_entanglement[3] << "\t" << q2_entanglement[4] << "\t" << q3_entanglement[0] << "\t" << q3_entanglement[1] << endl;
 
+     time(&t1);
      average_concurrence(q2_entanglement, promo_vector,basis2,L,2,LC2);  
+     time(&t2);     cout << "Average concurrence for the promoted state computed in " << difftime(t2,t1) << " seconds " << endl;
      //LN3(q3_entanglement, promo_vector,basis2,L,m,LCm);
      pr = PR(promo_vector);
 
-     myfile_promo << pr << "\t" << ES.eigenvalues()[l] << "\t" << ES.eigenvalues()[l] - sigmaJ << q2_entanglement[0] << "\t" << q2_entanglement[1] << "\t" << q2_entanglement[2] << "\t" << q2_entanglement[3] << "\t" << q2_entanglement[4] << "\t" << q3_entanglement[0] << "\t" << q3_entanglement[1] << endl;
+     myfile_promo << pr << "\t" << ES.eigenvalues()[l] << "\t" << ES.eigenvalues()[l] - sigmaJ << "\t" << q2_entanglement[0] << "\t" << q2_entanglement[1] << "\t" << q2_entanglement[2] << "\t" << q2_entanglement[3] << "\t" << q2_entanglement[4] << "\t" << q3_entanglement[0] << "\t" << q3_entanglement[1] << endl;
          
     }
     }
